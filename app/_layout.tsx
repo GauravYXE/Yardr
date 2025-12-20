@@ -31,6 +31,9 @@ export default function RootLayout() {
           <Stack.Screen name="favorites" options={{ headerShown: true, title: 'My Favorites' }} />
           <Stack.Screen name="reminders" options={{ headerShown: true, title: 'My Reminders' }} />
           <Stack.Screen name="history" options={{ headerShown: true, title: 'View History' }} />
+          <Stack.Screen name="wishlists" options={{ headerShown: true, title: 'My Wishlist' }} />
+          <Stack.Screen name="add-wishlist-item" options={{ headerShown: true, title: 'Add Wishlist Item' }} />
+          <Stack.Screen name="wishlist-matches/[id]" options={{ headerShown: true, title: 'Matches' }} />
           <Stack.Screen name="my-sales" options={{ headerShown: true, title: 'My Garage Sales' }} />
           <Stack.Screen name="edit-sale/[id]" options={{ headerShown: true, title: 'Edit Sale' }} />
           <Stack.Screen name="add-video/[id]" options={{ headerShown: true, title: 'Add Video' }} />

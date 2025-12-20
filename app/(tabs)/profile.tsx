@@ -105,6 +105,10 @@ export default function ProfileScreen() {
                 <ThemedText style={styles.featureText}>Track your viewing history</ThemedText>
               </View>
               <View style={styles.featureItem}>
+                <ThemedText style={styles.featureIcon}>⭐</ThemedText>
+                <ThemedText style={styles.featureText}>Get notified when wishlist items appear</ThemedText>
+              </View>
+              <View style={styles.featureItem}>
                 <ThemedText style={styles.featureIcon}>☁️</ThemedText>
                 <ThemedText style={styles.featureText}>Sync your sales across all devices</ThemedText>
               </View>
@@ -208,6 +212,17 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.menuItem}
+            onPress={() => router.push('/wishlists')}
+          >
+            <View style={styles.menuItemLeft}>
+              <ThemedText style={styles.menuIcon}>⭐</ThemedText>
+              <ThemedText style={styles.menuText}>My Wishlist</ThemedText>
+            </View>
+            <ThemedText style={styles.menuChevron}>›</ThemedText>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
             onPress={() => router.push('/my-sales')}
           >
             <View style={styles.menuItemLeft}>
@@ -256,6 +271,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.8,
     marginBottom: 20,
+    color: '#000',
   },
   featureList: {
     width: '100%',
@@ -274,6 +290,7 @@ const styles = StyleSheet.create({
   featureText: {
     flex: 1,
     fontSize: 15,
+    color: '#000',
   },
   primaryButton: {
     backgroundColor: '#0066FF',
@@ -310,6 +327,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     opacity: 0.6,
     marginTop: 8,
+    color: '#000',
   },
   userCard: {
     backgroundColor: '#f8f8f8',
@@ -340,6 +358,7 @@ const styles = StyleSheet.create({
   email: {
     opacity: 0.7,
     fontSize: 14,
+    color: '#000',
   },
   statsCard: {
     flexDirection: 'row',
@@ -362,6 +381,7 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 14,
     opacity: 0.7,
+    color: '#000',
   },
   statDivider: {
     width: 1,
@@ -392,6 +412,7 @@ const styles = StyleSheet.create({
   },
   menuText: {
     fontSize: 16,
+    color: '#000',
   },
   menuChevron: {
     fontSize: 24,

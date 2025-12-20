@@ -92,3 +92,77 @@ Respond ONLY with the JSON object, no other text.`,
     throw error;
   }
 }
+
+// Analyze if a garage sale matches a wishlist item using semantic understanding
+export async function analyzeWishlistMatch(
+  wishlistItem: { item_name: string; description: string | null; category: string | null },
+  garageSale: { title: string; description: string; categories?: string[] }
+): Promise<{ isMatch: boolean; reason: string }> {
+  if (!CLAUDE_API_KEY) {
+    throw new Error('EXPO_PUBLIC_CLAUDE_API_KEY environment variable is not set');
+  }
+
+  try {
+    const response = await fetch(CLAUDE_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': CLAUDE_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 256,
+        messages: [
+          {
+            role: 'user',
+            content: `Determine if a garage sale listing matches a user's wishlist item.
+
+WISHLIST ITEM:
+Name: ${wishlistItem.item_name}
+Description: ${wishlistItem.description || 'N/A'}
+Category: ${wishlistItem.category || 'N/A'}
+
+GARAGE SALE:
+Title: ${garageSale.title}
+Description: ${garageSale.description}
+Categories: ${garageSale.categories?.join(', ') || 'N/A'}
+
+Does this garage sale likely have the item the user is looking for? Consider semantic meaning, not just exact keyword matches.
+For example, "wine glasses" matches "glassware set" or "kitchen glasses".
+
+Respond ONLY with JSON:
+{
+  "isMatch": true/false,
+  "reason": "Brief explanation of why it matches or doesn't match (max 50 chars)"
+}`,
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Claude API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const textContent = data.content.find((block: any) => block.type === 'text');
+    if (!textContent) {
+      throw new Error('No text response from Claude');
+    }
+
+    const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('Could not extract JSON from response');
+    }
+
+    const result = JSON.parse(jsonMatch[0]);
+    return {
+      isMatch: result.isMatch || false,
+      reason: result.reason || 'Unknown',
+    };
+  } catch (error) {
+    console.error('Error analyzing wishlist match with Claude:', error);
+    throw error;
+  }
+}

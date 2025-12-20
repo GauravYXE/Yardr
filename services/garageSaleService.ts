@@ -1,5 +1,6 @@
 import { GarageSale } from '@/types/garageSale';
 import { supabase } from '@/lib/supabase';
+import { checkNewSaleAgainstWishlists } from './wishlistService';
 
 // Database row type from Supabase
 interface GarageSaleRow {
@@ -180,6 +181,11 @@ export const garageSaleService = {
         console.error('Supabase error:', error);
         throw error;
       }
+
+      // Background: Check new sale against all active wishlists
+      checkNewSaleAgainstWishlists(data.id).catch(err => {
+        console.error('Error checking sale against wishlists:', err);
+      });
 
       return mapRowToGarageSale(data);
     } catch (error) {
