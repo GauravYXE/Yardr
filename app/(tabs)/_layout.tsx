@@ -49,10 +49,11 @@ export default function TabLayout() {
 				}}
 			/>
 
-			{/* Dummy screen for Sell tab - intercepts and redirects */}
+			{/* Dummy screen for Sell tab - HIDDEN from tab bar, intercepts and redirects */}
 			<Tabs.Screen
 				name="sell"
 				options={{
+					href: null, // THIS HIDES IT FROM THE TAB BAR
 					title: "Sell",
 					tabBarIcon: ({ color }) => (
 						<IconSymbol size={32} name="plus.circle.fill" color={color} />

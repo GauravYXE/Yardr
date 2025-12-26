@@ -1,4 +1,5 @@
 import * as Location from "expo-location";
+import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
 	ActivityIndicator,
@@ -6,6 +7,7 @@ import {
 	SafeAreaView,
 	StyleSheet,
 	Text,
+	TouchableOpacity,
 	View,
 } from "react-native";
 import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
@@ -80,7 +82,6 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 
 				const perm = await Location.requestForegroundPermissionsAsync();
 				if (perm.status !== "granted") {
-					// Still load sales even without location permission
 					const list = await garageSaleService.getAllGarageSales();
 					setSales(list);
 					setAddressLine("Enable location for better results");
@@ -109,7 +110,6 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 			} catch (e: any) {
 				console.error(e);
 				setAddressLine("Location unavailable");
-				// Still try to load sales
 				try {
 					const list = await garageSaleService.getAllGarageSales();
 					setSales(list);
@@ -213,7 +213,14 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 				)}
 			</View>
 
-			{/* REMOVED: FloatingActionButton - using tab bar instead */}
+			{/* Floating Action Button */}
+			<TouchableOpacity
+				style={styles.fab}
+				onPress={() => router.push("/sell/video")}
+				activeOpacity={0.9}
+			>
+				<Text style={styles.fabIcon}>+</Text>
+			</TouchableOpacity>
 		</SafeAreaView>
 	);
 }
@@ -263,5 +270,29 @@ const styles = StyleSheet.create({
 		marginTop: 10,
 		borderWidth: 1,
 		borderColor: "#E6E1DA",
+	},
+
+	// Floating Action Button
+	fab: {
+		position: "absolute",
+		right: 20,
+		bottom: 100,
+		width: 64,
+		height: 64,
+		borderRadius: 32,
+		backgroundColor: "#D97B3F",
+		justifyContent: "center",
+		alignItems: "center",
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.3,
+		shadowRadius: 8,
+		elevation: 8,
+	},
+	fabIcon: {
+		fontSize: 32,
+		color: "#fff",
+		fontWeight: "300",
+		lineHeight: 36,
 	},
 });
