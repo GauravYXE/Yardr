@@ -2,6 +2,7 @@ import ProfileAuthSheet from "@/components/profile/ProfileAuthSheet";
 import ProfileMenuSheet from "@/components/profile/ProfileMenuSheet";
 import ProfileSignupSheet from "@/components/profile/ProfileSignupSheet";
 import { useAuth } from "@/contexts/AuthContext";
+import { router } from "expo-router";
 import { useState } from "react";
 import {
 	ScrollView,
@@ -86,7 +87,8 @@ export default function ProfileScreen() {
 					<Stat label="Visits" value="0" />
 				</View>
 
-				<MenuItem label="My Sales" onPress={() => setShowMenu(true)} />
+				{/* ✅ THIS IS THE IMPORTANT CHANGE */}
+				<MenuItem label="My Sales" onPress={() => router.push("/my-sales")} />
 				<MenuItem label="Saved Sales" />
 				<MenuItem label="Notifications" />
 				<MenuItem label="Settings" />
@@ -97,6 +99,7 @@ export default function ProfileScreen() {
 				</TouchableOpacity>
 			</ScrollView>
 
+			{/* This menu sheet is for OTHER actions, not My Sales */}
 			<ProfileMenuSheet visible={showMenu} onClose={() => setShowMenu(false)} />
 		</>
 	);
@@ -111,9 +114,13 @@ function Stat({ label, value }: { label: string; value: string }) {
 	);
 }
 
-function MenuItem({ label, onPress }: any) {
+function MenuItem({ label, onPress }: { label: string; onPress?: () => void }) {
 	return (
-		<TouchableOpacity style={styles.menuItem} onPress={onPress}>
+		<TouchableOpacity
+			style={styles.menuItem}
+			onPress={onPress}
+			disabled={!onPress}
+		>
 			<Text style={styles.menuText}>{label}</Text>
 			<Text style={styles.arrow}>›</Text>
 		</TouchableOpacity>

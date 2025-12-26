@@ -1,464 +1,342 @@
-// app/sale-detail/[id].tsx
-import FavoriteButton from "@/components/FavoriteButton";
-import ReminderButton from "@/components/ReminderButton";
-import { useAuth } from "@/contexts/AuthContext";
+import { ThemedText } from "@/components/themed-text";
 import { garageSaleService } from "@/services/garageSaleService";
-import { historyService } from "@/services/historyService";
 import { GarageSale } from "@/types/garageSale";
-import { ResizeMode, Video } from "expo-av";
-import { Image } from "expo-image";
-import * as Location from "expo-location";
+import { MaterialIcons } from "@expo/vector-icons";
+import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
 	Alert,
-	Dimensions,
-	Linking,
-	Platform,
+	Image,
 	ScrollView,
+	Share,
 	StyleSheet,
-	Text,
 	TouchableOpacity,
 	View,
 } from "react-native";
 
-const { width } = Dimensions.get("window");
-
-export default function SaleDetailScreen() {
+export default function ViewSaleScreen() {
 	const { id } = useLocalSearchParams();
-	const { user, isAuthenticated } = useAuth();
-	const [sale, setSale] = useState<GarageSale | null>(null);
 	const [loading, setLoading] = useState(true);
-	const [userLocation, setUserLocation] = useState<{
-		latitude: number;
-		longitude: number;
-	} | null>(null);
+	const [sale, setSale] = useState<GarageSale | null>(null);
 
 	useEffect(() => {
 		loadSale();
-		getUserLocation();
 	}, [id]);
 
 	const loadSale = async () => {
 		try {
 			const saleData = await garageSaleService.getGarageSaleById(id as string);
-			if (saleData) {
-				setSale(saleData);
-
-				if (isAuthenticated && user) {
-					historyService.recordView(user.id, id as string);
-				}
-			} else {
+			if (!saleData) {
 				Alert.alert("Error", "Garage sale not found");
-				if (router.canGoBack()) router.back();
-				else router.replace("/(tabs)");
+				router.back();
+				return;
 			}
-		} catch (error) {
-			console.error("Error loading sale:", error);
+			setSale(saleData);
+		} catch {
 			Alert.alert("Error", "Failed to load garage sale");
-			if (router.canGoBack()) router.back();
-			else router.replace("/(tabs)");
+			router.back();
 		} finally {
 			setLoading(false);
 		}
 	};
 
-	const getUserLocation = async () => {
-		try {
-			const { status } = await Location.requestForegroundPermissionsAsync();
-			if (status === "granted") {
-				const location = await Location.getCurrentPositionAsync({});
-				setUserLocation({
-					latitude: location.coords.latitude,
-					longitude: location.coords.longitude,
-				});
-			}
-		} catch (error) {
-			console.error("Error getting location:", error);
-		}
+	const handleShare = async () => {
+		if (!sale) return;
+		await Share.share({
+			title: sale.title,
+			message: `${sale.title}\n${sale.location.address}`,
+		});
 	};
 
-	const calculateDistance = (): string => {
-		if (!userLocation || !sale) return "N/A";
-
-		const R = 6371;
-		const dLat = toRad(sale.location.latitude - userLocation.latitude);
-		const dLon = toRad(sale.location.longitude - userLocation.longitude);
-		const lat1 = toRad(userLocation.latitude);
-		const lat2 = toRad(sale.location.latitude);
-
-		const a =
-			Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-			Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
-		const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-		const distance = R * c;
-
-		if (distance < 1) {
-			return `${Math.round(distance * 1000)} ft`;
-		}
-		return `${distance.toFixed(1)} km`;
+	const handleGetDirections = () => {
+		if (!sale) return;
+		const url = `https://maps.google.com/?q=${sale.location.latitude},${sale.location.longitude}`;
+		Linking.openURL(url);
 	};
 
-	const toRad = (value: number): number => {
-		return (value * Math.PI) / 180;
+	const handleCall = () => {
+		if (!sale?.contactPhone) return;
+		Linking.openURL(`tel:${sale.contactPhone}`);
 	};
 
-	const formatDate = (dateString: string) => {
-		const date = new Date(dateString);
-		return date.toLocaleDateString("en-US", {
+	const handleMessage = () => {
+		if (!sale?.contactPhone) return;
+		Linking.openURL(`sms:${sale.contactPhone}`);
+	};
+
+	const formatFullDate = (dateStr: string) =>
+		new Date(dateStr).toLocaleDateString("en-US", {
 			weekday: "long",
 			month: "long",
 			day: "numeric",
 			year: "numeric",
 		});
-	};
 
-	const formatTime = (time: string) => {
-		const [hours, minutes] = time.split(":");
-		const hour = parseInt(hours);
-		const ampm = hour >= 12 ? "PM" : "AM";
-		const displayHour = hour % 12 || 12;
-		return `${displayHour}:${minutes} ${ampm}`;
-	};
-
-	const handleCall = () => {
-		if (!sale?.contactPhone) {
-			Alert.alert("No Phone", "No phone number provided for this sale");
-			return;
-		}
-		Linking.openURL(`tel:${sale.contactPhone}`);
-	};
-
-	const handleEmail = () => {
-		if (!sale?.contactEmail) {
-			Alert.alert("No Email", "No email address provided for this sale");
-			return;
-		}
-		Linking.openURL(
-			`mailto:${sale.contactEmail}?subject=Inquiry about ${sale.title}`
-		);
-	};
-
-	const handleGetDirections = () => {
-		if (!sale) return;
-
-		const { latitude, longitude } = sale.location;
-		const label = encodeURIComponent(sale.title);
-
-		const url = Platform.select({
-			ios: `maps:0,0?q=${label}@${latitude},${longitude}`,
-			android: `geo:0,0?q=${latitude},${longitude}(${label})`,
-			default: `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`,
-		});
-
-		Linking.openURL(url!);
-	};
-
-	if (loading) {
+	if (loading || !sale) {
 		return (
-			<View style={styles.container}>
-				<View style={styles.loadingContainer}>
-					<Text style={styles.loadingText}>Loading...</Text>
-				</View>
+			<View style={styles.center}>
+				<ThemedText>Loading...</ThemedText>
 			</View>
 		);
 	}
 
-	if (!sale) {
-		return null;
-	}
-
 	return (
 		<View style={styles.container}>
-			<ScrollView contentContainerStyle={styles.content}>
-				{/* Media Section */}
-				<View style={styles.mediaContainer}>
-					{sale.videoUrl ? (
-						<Video
-							source={{ uri: sale.videoUrl }}
-							style={styles.video}
-							resizeMode={ResizeMode.COVER}
-							useNativeControls
-							isLooping
-						/>
-					) : sale.images && sale.images.length > 0 ? (
-						<Image
-							source={{ uri: sale.images[0] }}
-							style={styles.video}
-							contentFit="cover"
-						/>
-					) : (
-						<View style={[styles.video, styles.noMedia]}>
-							<Text style={styles.noMediaText}>📦</Text>
-						</View>
-					)}
-				</View>
+			<ScrollView showsVerticalScrollIndicator={false}>
+				{/* HERO */}
+				<View style={styles.hero}>
+					<Image source={{ uri: sale.videoUrl }} style={styles.heroImage} />
 
-				{/* Content Card */}
-				<View style={styles.detailsCard}>
-					{/* Title */}
-					<Text style={styles.title}>{sale.title}</Text>
-
-					{/* Date & Time Section */}
-					<View style={styles.infoSection}>
-						<View style={styles.infoHeader}>
-							<Text style={styles.infoIcon}>📅</Text>
-							<Text style={styles.infoTitle}>When</Text>
-						</View>
-						<Text style={styles.infoValue}>{formatDate(sale.date)}</Text>
-						<Text style={styles.infoValue}>
-							{formatTime(sale.startTime)} - {formatTime(sale.endTime)}
-						</Text>
-					</View>
-
-					{/* Location Section */}
-					<View style={styles.infoSection}>
-						<View style={styles.infoHeader}>
-							<Text style={styles.infoIcon}>📍</Text>
-							<Text style={styles.infoTitle}>Location</Text>
-						</View>
-						<Text style={styles.infoValue}>{sale.location.address}</Text>
-						<Text style={styles.distanceText}>{calculateDistance()} away</Text>
-					</View>
-
-					{/* Categories Section */}
-					{sale.categories && sale.categories.length > 0 && (
-						<View style={styles.infoSection}>
-							<View style={styles.infoHeader}>
-								<Text style={styles.infoIcon}>🏷️</Text>
-								<Text style={styles.infoTitle}>Categories</Text>
-							</View>
-							<View style={styles.tagsContainer}>
-								{sale.categories.map((cat, idx) => (
-									<View key={idx} style={styles.tag}>
-										<Text style={styles.tagText}>{cat}</Text>
-									</View>
-								))}
-							</View>
-						</View>
-					)}
-
-					{/* Description Section */}
-					{sale.description && (
-						<View style={styles.infoSection}>
-							<View style={styles.infoHeader}>
-								<Text style={styles.infoIcon}>📝</Text>
-								<Text style={styles.infoTitle}>Description</Text>
-							</View>
-							<Text style={styles.descriptionText}>{sale.description}</Text>
-						</View>
-					)}
-
-					{/* Contact Section */}
-					<View style={styles.infoSection}>
-						<View style={styles.infoHeader}>
-							<Text style={styles.infoIcon}>👤</Text>
-							<Text style={styles.infoTitle}>Contact</Text>
-						</View>
-						<Text style={styles.infoValue}>{sale.contactName}</Text>
-					</View>
-				</View>
-
-				{/* Action Buttons */}
-				<View style={styles.actionsCard}>
 					<TouchableOpacity
-						style={styles.primaryButton}
-						onPress={handleGetDirections}
-						activeOpacity={0.8}
+						style={styles.heroBtn}
+						onPress={() => router.back()}
 					>
-						<Text style={styles.buttonIcon}>🗺️</Text>
-						<Text style={styles.primaryButtonText}>Get Directions</Text>
+						<MaterialIcons name="arrow-back" size={20} color="#333" />
 					</TouchableOpacity>
 
-					<View style={styles.secondaryButtons}>
-						{sale.contactPhone && (
-							<TouchableOpacity
-								style={styles.secondaryButton}
-								onPress={handleCall}
-								activeOpacity={0.8}
-							>
-								<Text style={styles.buttonIcon}>📞</Text>
-								<Text style={styles.secondaryButtonText}>Call</Text>
-							</TouchableOpacity>
-						)}
-
-						{sale.contactEmail && (
-							<TouchableOpacity
-								style={styles.secondaryButton}
-								onPress={handleEmail}
-								activeOpacity={0.8}
-							>
-								<Text style={styles.buttonIcon}>✉️</Text>
-								<Text style={styles.secondaryButtonText}>Email</Text>
-							</TouchableOpacity>
-						)}
-					</View>
+					<TouchableOpacity
+						style={[styles.heroBtn, styles.heroBtnRight]}
+						onPress={handleShare}
+					>
+						<MaterialIcons name="share" size={20} color="#333" />
+					</TouchableOpacity>
 				</View>
 
-				{/* Save Actions */}
-				<View style={styles.saveActionsCard}>
-					<FavoriteButton garageSaleId={sale.id} size={24} showLabel />
-					<ReminderButton
-						garageSaleId={sale.id}
-						garageSaleTitle={sale.title}
-						garageSaleDate={sale.startDate || sale.date}
-						size={24}
-						showLabel
-					/>
+				{/* CONTENT */}
+				<View style={styles.content}>
+					<View style={styles.card}>
+						<ThemedText style={styles.title}>{sale.title}</ThemedText>
+
+						{/* Categories */}
+						<View style={styles.chips}>
+							{sale.categories?.map((c, i) => (
+								<View key={i} style={styles.chip}>
+									<ThemedText style={styles.chipText}>{c}</ThemedText>
+								</View>
+							))}
+						</View>
+
+						{/* DETAILS */}
+						<View style={styles.details}>
+							<View style={styles.row}>
+								<MaterialIcons
+									name="calendar-today"
+									size={18}
+									color="#FF9500"
+								/>
+								<View style={styles.textWrap}>
+									<ThemedText style={styles.label}>When</ThemedText>
+									<ThemedText style={styles.value}>
+										{formatFullDate(sale.date)}
+									</ThemedText>
+									<ThemedText style={styles.sub}>
+										{sale.startTime} – {sale.endTime}
+									</ThemedText>
+								</View>
+							</View>
+
+							<View style={styles.divider} />
+
+							<View style={styles.row}>
+								<MaterialIcons name="location-on" size={18} color="#FF9500" />
+								<View style={styles.textWrap}>
+									<ThemedText style={styles.label}>Location</ThemedText>
+									<ThemedText style={styles.value}>
+										{sale.location.address}
+									</ThemedText>
+									<ThemedText style={styles.sub}>0 ft away</ThemedText>
+								</View>
+							</View>
+
+							<View style={styles.divider} />
+
+							<ThemedText style={styles.description}>
+								{sale.description}
+							</ThemedText>
+						</View>
+
+						{/* HOST */}
+						<View style={styles.host}>
+							<View style={styles.hostLeft}>
+								<View style={styles.avatar}>
+									<MaterialIcons name="person" size={22} color="#777" />
+								</View>
+								<View>
+									<ThemedText style={styles.hostName}>
+										{sale.contactName}
+									</ThemedText>
+									<ThemedText style={styles.hostRole}>Host</ThemedText>
+								</View>
+							</View>
+
+							<View style={styles.hostActions}>
+								<TouchableOpacity onPress={handleCall} style={styles.iconBtn}>
+									<MaterialIcons name="phone" size={18} color="#FF9500" />
+								</TouchableOpacity>
+								<TouchableOpacity
+									onPress={handleMessage}
+									style={styles.iconBtn}
+								>
+									<MaterialIcons
+										name="chat-bubble-outline"
+										size={18}
+										color="#FF9500"
+									/>
+								</TouchableOpacity>
+							</View>
+						</View>
+
+						{/* FEATURED ITEMS */}
+						<ThemedText style={styles.sectionTitle}>Featured Items</ThemedText>
+
+						<View style={styles.grid}>
+							{[1, 2, 3, 4].map((i) => (
+								<View key={i} style={styles.item}>
+									<View style={styles.itemImg} />
+									<ThemedText style={styles.itemName}>Item {i}</ThemedText>
+									<ThemedText style={styles.price}>$25</ThemedText>
+								</View>
+							))}
+						</View>
+					</View>
+
+					<View style={{ height: 120 }} />
 				</View>
 			</ScrollView>
+
+			{/* CTA */}
+			<View style={styles.ctaBar}>
+				<TouchableOpacity style={styles.cta} onPress={handleGetDirections}>
+					<MaterialIcons name="near-me" size={20} color="#fff" />
+					<ThemedText style={styles.ctaText}>Get Directions</ThemedText>
+				</TouchableOpacity>
+			</View>
 		</View>
 	);
 }
 
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "#0A0A0A",
+	container: { flex: 1, backgroundColor: "#FCF8F2" },
+	center: { flex: 1, justifyContent: "center", alignItems: "center" },
+
+	hero: { height: 320 },
+	heroImage: { width: "100%", height: "100%" },
+	heroBtn: {
+		position: "absolute",
+		top: 16,
+		left: 16,
+		backgroundColor: "#fff",
+		borderRadius: 24,
+		padding: 12,
 	},
-	loadingContainer: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
+	heroBtnRight: { left: undefined, right: 16 },
+
+	content: { marginTop: -32 },
+	card: {
+		backgroundColor: "#FCF8F2",
+		borderTopLeftRadius: 24,
+		borderTopRightRadius: 24,
+		padding: 16,
 	},
-	loadingText: {
-		fontSize: 16,
-		color: "#999",
-	},
-	content: {
-		paddingBottom: 40,
-	},
-	mediaContainer: {
-		width: width,
-		height: 280,
-		backgroundColor: "#1A1A1A",
-	},
-	video: {
-		width: "100%",
-		height: "100%",
-	},
-	noMedia: {
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	noMediaText: {
-		fontSize: 64,
-		opacity: 0.3,
-	},
-	detailsCard: {
-		backgroundColor: "#1A1A1A",
-		margin: 20,
-		marginBottom: 12,
-		padding: 20,
+
+	title: { fontSize: 24, fontWeight: "700", marginBottom: 12 },
+	chips: { flexDirection: "row", flexWrap: "wrap", marginBottom: 16 },
+	chip: {
+		backgroundColor: "#FFE8D1",
 		borderRadius: 16,
-	},
-	title: {
-		fontSize: 24,
-		fontWeight: "bold",
-		color: "#FFF",
-		marginBottom: 24,
-	},
-	infoSection: {
-		marginBottom: 20,
-	},
-	infoHeader: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 8,
-		marginBottom: 8,
-	},
-	infoIcon: {
-		fontSize: 18,
-	},
-	infoTitle: {
-		fontSize: 12,
-		fontWeight: "600",
-		color: "#999",
-		textTransform: "uppercase",
-		letterSpacing: 0.5,
-	},
-	infoValue: {
-		fontSize: 16,
-		color: "#FFF",
-		marginBottom: 4,
-	},
-	distanceText: {
-		fontSize: 14,
-		color: "#999",
-		marginTop: 4,
-	},
-	descriptionText: {
-		fontSize: 15,
-		lineHeight: 22,
-		color: "#CCC",
-	},
-	tagsContainer: {
-		flexDirection: "row",
-		flexWrap: "wrap",
-		gap: 8,
-	},
-	tag: {
-		backgroundColor: "#2A2A2A",
 		paddingHorizontal: 12,
 		paddingVertical: 6,
+		marginRight: 8,
+		marginBottom: 8,
+	},
+	chipText: { color: "#FF9500", fontWeight: "600", fontSize: 13 },
+
+	details: {
+		backgroundColor: "#fff",
+		borderRadius: 16,
+		padding: 16,
+		marginBottom: 20,
+	},
+	row: { flexDirection: "row" },
+	textWrap: { marginLeft: 12, flex: 1 },
+	label: { fontSize: 12, color: "#999", fontWeight: "600" },
+	value: { fontSize: 16, fontWeight: "600", marginTop: 4 },
+	sub: { fontSize: 13, color: "#666" },
+	divider: { height: 1, backgroundColor: "#eee", marginVertical: 16 },
+	description: { fontSize: 14, lineHeight: 22, color: "#333" },
+
+	host: {
+		backgroundColor: "#fff",
+		borderRadius: 16,
+		padding: 16,
+		flexDirection: "row",
+		justifyContent: "space-between",
+		marginBottom: 24,
+	},
+	hostLeft: { flexDirection: "row", alignItems: "center" },
+	avatar: {
+		width: 44,
+		height: 44,
+		borderRadius: 22,
+		backgroundColor: "#eee",
+		justifyContent: "center",
+		alignItems: "center",
+		marginRight: 12,
+	},
+	hostName: { fontWeight: "600" },
+	hostRole: { fontSize: 12, color: "#999" },
+	hostActions: { flexDirection: "row" },
+	iconBtn: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		borderWidth: 1,
+		borderColor: "#eee",
+		justifyContent: "center",
+		alignItems: "center",
+		marginLeft: 8,
+	},
+
+	sectionTitle: { fontSize: 18, fontWeight: "700", marginBottom: 12 },
+	grid: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		justifyContent: "space-between",
+	},
+	item: {
+		width: "48%",
+		backgroundColor: "#fff",
+		borderRadius: 16,
+		padding: 12,
+		marginBottom: 16,
+	},
+	itemImg: {
+		height: 120,
+		backgroundColor: "#eee",
 		borderRadius: 12,
-	},
-	tagText: {
-		fontSize: 13,
-		color: "#999",
-		fontWeight: "500",
-	},
-	actionsCard: {
-		backgroundColor: "#1A1A1A",
-		marginHorizontal: 20,
 		marginBottom: 12,
+	},
+	itemName: { fontWeight: "600" },
+	price: { color: "#FF9500", fontWeight: "700" },
+
+	ctaBar: {
+		position: "absolute",
+		bottom: 0,
+		left: 0,
+		right: 0,
 		padding: 16,
-		borderRadius: 16,
-		gap: 12,
+		backgroundColor: "#fff",
+		borderTopWidth: 1,
+		borderTopColor: "#eee",
 	},
-	primaryButton: {
+	cta: {
+		backgroundColor: "#FF9500",
+		paddingVertical: 16,
+		borderRadius: 14,
 		flexDirection: "row",
-		alignItems: "center",
 		justifyContent: "center",
-		backgroundColor: "#007AFF",
-		paddingVertical: 14,
-		borderRadius: 12,
-		gap: 8,
-	},
-	buttonIcon: {
-		fontSize: 18,
-	},
-	primaryButtonText: {
-		fontSize: 16,
-		fontWeight: "600",
-		color: "#FFF",
-	},
-	secondaryButtons: {
-		flexDirection: "row",
-		gap: 12,
-	},
-	secondaryButton: {
-		flex: 1,
-		flexDirection: "row",
 		alignItems: "center",
-		justifyContent: "center",
-		backgroundColor: "#2A2A2A",
-		paddingVertical: 12,
-		borderRadius: 12,
-		gap: 6,
 	},
-	secondaryButtonText: {
-		fontSize: 15,
-		fontWeight: "600",
-		color: "#FFF",
-	},
-	saveActionsCard: {
-		backgroundColor: "#1A1A1A",
-		marginHorizontal: 20,
-		padding: 16,
-		borderRadius: 16,
-		flexDirection: "row",
-		justifyContent: "space-around",
-		gap: 12,
-	},
+	ctaText: { color: "#fff", fontSize: 16, fontWeight: "700", marginLeft: 8 },
 });

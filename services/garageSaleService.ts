@@ -392,3 +392,26 @@ async function getNearbyActiveSales(lat: number, lng: number, radiusKm = 10) {
 		return km <= radiusKm;
 	});
 }
+
+export async function getMySales(userId: string) {
+	const { data, error } = await supabase
+		.from("garage_sales")
+		.select("*")
+		.eq("user_id", userId)
+		.order("created_at", { ascending: false });
+
+	if (error) throw error;
+	return data;
+}
+
+export const deleteSale = async (saleId: string) => {
+	const { error } = await supabase
+		.from("garage_sales")
+		.update({ is_active: false })
+		.eq("id", saleId);
+
+	if (error) {
+		console.error("Soft delete failed:", error);
+		throw error;
+	}
+};

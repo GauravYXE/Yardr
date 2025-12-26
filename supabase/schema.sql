@@ -19,6 +19,26 @@ CREATE TABLE garage_sales (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE POLICY "Block hard deletes by default"
+ON garage_sales
+FOR DELETE
+USING (false);
+
+
+DROP POLICY IF EXISTS "Anyone can deactivate garage sales"
+ON garage_sales;
+
+CREATE POLICY "Allow deactivating garage sales"
+ON garage_sales
+FOR UPDATE
+USING (true)
+WITH CHECK (
+  is_active = false OR is_active = true
+);
+
+
+
+
 -- Enable Row Level Security
 ALTER TABLE garage_sales ENABLE ROW LEVEL SECURITY;
 
