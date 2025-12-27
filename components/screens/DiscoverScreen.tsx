@@ -1,3 +1,4 @@
+// components/screens/DiscoverScreen.tsx
 import { useFocusEffect } from "@react-navigation/native";
 import * as Location from "expo-location";
 import { router } from "expo-router";

@@ -4,8 +4,7 @@ import { garageSaleService } from "@/services/garageSaleService";
 import { rateLimitService } from "@/services/rateLimitService";
 import { UserProfile } from "@/types/user";
 import { Session, User } from "@supabase/supabase-js";
-import { router } from "expo-router"; // ← NEW: Required for navigation
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 
 interface AuthContextType {
 	session: Session | null;
@@ -32,12 +31,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 	const [user, setUser] = useState<User | null>(null);
 	const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 	const [loading, setLoading] = useState(true);
+	const wasLoggedInRef = useRef<boolean>(false);
 
 	useEffect(() => {
 		// Get initial session on app start
 		authService.getSession().then((session) => {
 			setSession(session);
 			setUser(session?.user || null);
+			wasLoggedInRef.current = !!session?.user;
 
 			if (session?.user) {
 				loadUserProfile(session.user.id);
@@ -48,21 +49,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
 		// Listen for auth state changes (login, logout, etc.)
 		const subscription = authService.onAuthStateChange((session) => {
-			const wasLoggedIn = !!user; // Remember if user was already logged in
+			const wasLoggedIn = wasLoggedInRef.current;
+			const isNowLoggedIn = !!session?.user;
 
 			setSession(session);
 			setUser(session?.user || null);
+			wasLoggedInRef.current = isNowLoggedIn;
 
 			if (session?.user) {
 				loadUserProfile(session.user.id);
-
-				// NEW: User just successfully signed in
-				if (!wasLoggedIn && session.user) {
-					// Small delay to ensure navigation stack is ready
-					setTimeout(() => {
-						router.replace("/add-sale");
-					}, 300);
-				}
 			} else {
 				setUserProfile(null);
 			}
@@ -71,7 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 		return () => {
 			subscription.unsubscribe();
 		};
-	}, [user]); // ← IMPORTANT: Add 'user' as dependency
+	}, []); // Empty dependency array - only run once on mount
 
 	const loadUserProfile = async (userId: string) => {
 		try {

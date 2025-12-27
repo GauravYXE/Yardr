@@ -1,3 +1,4 @@
+// app/my-sales.tsx
 import { useAuth } from "@/contexts/AuthContext";
 import { deleteSale, getMySales } from "@/services/garageSaleService";
 import { router, useFocusEffect } from "expo-router";
