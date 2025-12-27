@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
@@ -28,9 +28,11 @@ function formatTimeRange(startTime?: string, endTime?: string) {
 export default function SaleCard({
 	sale,
 	distanceText,
+	onPress,
 }: {
 	sale: GarageSale;
 	distanceText?: string;
+	onPress?: () => void;
 }) {
 	const colorScheme = useColorScheme();
 	const theme = Colors[colorScheme ?? "light"];
@@ -44,12 +46,16 @@ export default function SaleCard({
 		[sale.startTime, sale.endTime]
 	);
 
+	const CardComponent = onPress ? TouchableOpacity : View;
+
 	return (
-		<View
+		<CardComponent
 			style={[
 				styles.card,
 				{ backgroundColor: theme.card, borderColor: theme.border },
 			]}
+			onPress={onPress}
+			activeOpacity={onPress ? 0.95 : 1}
 		>
 			<View style={styles.mediaWrap}>
 				{img ? (
@@ -123,7 +129,7 @@ export default function SaleCard({
 					</Text>
 				</View>
 			</View>
-		</View>
+		</CardComponent>
 	);
 }
 

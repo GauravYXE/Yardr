@@ -197,7 +197,11 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 						keyExtractor={(item) => item.id}
 						contentContainerStyle={{ paddingBottom: 120 }}
 						renderItem={({ item }) => (
-							<SaleCard sale={item} distanceText={item._distanceText} />
+							<SaleCard
+								sale={item}
+								distanceText={item._distanceText}
+								onPress={() => router.push(`/sale-detail/${item.id}`)}
+							/>
 						)}
 						showsVerticalScrollIndicator={false}
 						refreshControl={
