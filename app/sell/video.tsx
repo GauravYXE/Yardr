@@ -1,3 +1,4 @@
+// app/sell/video.tsx
 import { ResizeMode, Video } from "expo-av";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";

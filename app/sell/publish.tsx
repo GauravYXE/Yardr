@@ -1,3 +1,4 @@
+// app/sell/publish.tsx
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { ResizeMode, Video } from "expo-av";
 import { router } from "expo-router";
@@ -24,7 +25,6 @@ import {
 	SellDraft,
 } from "@/lib/draftSale";
 import { garageSaleService } from "@/services/garageSaleService";
-import { rateLimitService } from "@/services/rateLimitService";
 
 // Step indicator component
 function StepHeader({ step }: { step: 1 | 2 | 3 }) {
@@ -98,6 +98,16 @@ function prettyTime(d: Date) {
 	return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+// Helper: Get next Saturday
+function getNextSaturday(): Date {
+	const today = new Date();
+	const dayOfWeek = today.getDay();
+	const daysUntilSaturday = (6 - dayOfWeek + 7) % 7 || 7;
+	const nextSaturday = new Date(today);
+	nextSaturday.setDate(today.getDate() + daysUntilSaturday);
+	return nextSaturday;
+}
+
 export default function PublishSaleScreen() {
 	const { user } = useAuth();
 
@@ -128,54 +138,51 @@ export default function PublishSaleScreen() {
 
 		(async () => {
 			const d = await loadSellDraft();
-			if (!mounted) return;
+			if (!mounted || !d) return;
 
 			setDraft(d);
 
 			// Prefill contact info
-			setContactName(d?.contactName || "");
-			setPhone(d?.contactPhone || "");
-			setEmail(d?.contactEmail || user?.email || "");
+			setContactName(d.contactName || "");
+			setPhone(d.contactPhone || "");
+			setEmail(d.contactEmail || user?.email || "");
 
-			// Setup default dates/times
-			const today = new Date();
-			const defaultStart = new Date();
-			defaultStart.setHours(9, 0, 0, 0);
-			const defaultEnd = new Date();
-			defaultEnd.setHours(15, 0, 0, 0);
+			// Default times: 8 AM to 4 PM
+			const defaultStartTime = new Date();
+			defaultStartTime.setHours(8, 0, 0, 0);
+			const defaultEndTime = new Date();
+			defaultEndTime.setHours(16, 0, 0, 0);
 
-			// Restore from draft if available
-			if (d?.startDate) {
-				const sd = new Date(d.startDate + "T00:00:00");
-				setStartDate(sd);
-			} else {
-				setStartDate(today);
-			}
+			// Default date: next Saturday
+			const nextSaturday = getNextSaturday();
 
-			if (d?.endDate) {
-				const ed = new Date(d.endDate + "T00:00:00");
-				setEndDate(ed);
-			} else {
-				setEndDate(today);
-			}
+			// Restore or set defaults
+			setStartDate(
+				d.startDate ? new Date(d.startDate + "T00:00:00") : nextSaturday
+			);
+			setEndDate(d.endDate ? new Date(d.endDate + "T00:00:00") : nextSaturday);
 
-			if (d?.startTime) {
-				const t = new Date();
-				const [hh, mm] = d.startTime.split(":").map(Number);
-				t.setHours(hh, mm, 0, 0);
-				setStartTime(t);
-			} else {
-				setStartTime(defaultStart);
-			}
+			setStartTime(
+				d.startTime
+					? (() => {
+							const t = new Date();
+							const [hh, mm] = d.startTime!.split(":").map(Number);
+							t.setHours(hh, mm, 0, 0);
+							return t;
+					  })()
+					: defaultStartTime
+			);
 
-			if (d?.endTime) {
-				const t = new Date();
-				const [hh, mm] = d.endTime.split(":").map(Number);
-				t.setHours(hh, mm, 0, 0);
-				setEndTime(t);
-			} else {
-				setEndTime(defaultEnd);
-			}
+			setEndTime(
+				d.endTime
+					? (() => {
+							const t = new Date();
+							const [hh, mm] = d.endTime!.split(":").map(Number);
+							t.setHours(hh, mm, 0, 0);
+							return t;
+					  })()
+					: defaultEndTime
+			);
 
 			setLoading(false);
 		})();
@@ -192,7 +199,7 @@ export default function PublishSaleScreen() {
 		saveSellDraft({
 			...draft,
 			contactName,
-			contactPhone: phone,
+			contactPhone: phone.replace(/\D/g, ""), // save clean number
 			contactEmail: email,
 			startDate: yyyyMmDd(startDate),
 			endDate: yyyyMmDd(endDate),
@@ -211,14 +218,25 @@ export default function PublishSaleScreen() {
 		endTime,
 	]);
 
+	// Phone number formatting (display only)
+	const formatPhone = (raw: string) => {
+		const cleaned = raw.replace(/\D/g, "").slice(0, 10);
+		if (cleaned.length <= 3) return cleaned;
+		if (cleaned.length <= 6)
+			return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+		return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(
+			6
+		)}`;
+	};
+
 	// Validation
 	const canPublish = useMemo(() => {
 		return (
 			!!draft &&
-			!!draft.title &&
-			!!draft.description &&
+			!!draft.title?.trim() &&
+			!!draft.description?.trim() &&
 			contactName.trim().length > 0 &&
-			!!draft.addressLine
+			!!draft.addressLine?.trim()
 		);
 	}, [draft, contactName]);
 
@@ -226,7 +244,7 @@ export default function PublishSaleScreen() {
 	const handlePublish = async () => {
 		if (!draft || !canPublish) {
 			Alert.alert(
-				"Missing information",
+				"Missing Information",
 				"Please complete all required fields."
 			);
 			return;
@@ -234,13 +252,14 @@ export default function PublishSaleScreen() {
 
 		// Validate times
 		const startDateTime = new Date(startDate);
-		startDateTime.setHours(startTime.getHours(), startTime.getMinutes());
+		startDateTime.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
+
 		const endDateTime = new Date(endDate);
-		endDateTime.setHours(endTime.getHours(), endTime.getMinutes());
+		endDateTime.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
 
 		if (endDateTime <= startDateTime) {
 			Alert.alert(
-				"Invalid time",
+				"Invalid Schedule",
 				"End date/time must be after start date/time."
 			);
 			return;
@@ -249,21 +268,11 @@ export default function PublishSaleScreen() {
 		setPublishing(true);
 
 		try {
-			// Check rate limit
-			const rateCheck = await rateLimitService.checkRateLimit();
-			if (!rateCheck.allowed) {
-				Alert.alert(
-					"Posting Limit Reached",
-					rateCheck.message || "You have reached the posting limit."
-				);
-				setPublishing(false);
-				return;
-			}
+			// Temporary device ID (replace with real rate limiting later)
+			const deviceId = `device-${Date.now()}-${Math.random()
+				.toString(36)
+				.substr(2, 9)}`;
 
-			// Get device ID
-			const deviceId = await rateLimitService.getDeviceId();
-
-			// Create garage sale
 			await garageSaleService.addGarageSale(
 				{
 					title: draft.title!,
@@ -280,7 +289,7 @@ export default function PublishSaleScreen() {
 					startTime: hhmm24(startTime),
 					endTime: hhmm24(endTime),
 					contactName: contactName.trim(),
-					contactPhone: phone.trim() || undefined,
+					contactPhone: phone.replace(/\D/g, "") || undefined,
 					contactEmail: email.trim() || undefined,
 					videoUrl: draft.videoUri || undefined,
 					images: draft.photos || undefined,
@@ -290,12 +299,14 @@ export default function PublishSaleScreen() {
 				user?.id
 			);
 
-			// Clear draft and navigate to success
 			await clearSellDraft();
 			router.replace("/sell/success");
-		} catch (e) {
-			console.error(e);
-			Alert.alert("Error", "Failed to publish sale. Please try again.");
+		} catch (e: any) {
+			console.error("Publish error:", e);
+			Alert.alert(
+				"Publish Failed",
+				e.message || "Something went wrong. Please try again."
+			);
 		} finally {
 			setPublishing(false);
 		}
@@ -307,7 +318,7 @@ export default function PublishSaleScreen() {
 	};
 
 	if (loading || !draft) {
-		return null;
+		return null; // Or show a nice loader
 	}
 
 	return (
@@ -351,7 +362,6 @@ export default function PublishSaleScreen() {
 							<IconSymbol size={18} name="tag.fill" color="#D97B3F" />
 							<Text style={styles.cardTitle}>AI-Generated Tags</Text>
 						</View>
-
 						<View style={styles.chips}>
 							{draft.categories.map((c, idx) => (
 								<View key={idx} style={styles.chip}>
@@ -369,7 +379,6 @@ export default function PublishSaleScreen() {
 							<IconSymbol size={18} name="location.fill" color="#D97B3F" />
 							<Text style={styles.cardTitle}>Detected Location</Text>
 						</View>
-
 						<View style={styles.locationBox}>
 							<Text style={styles.locationText}>📍 {draft.addressLine}</Text>
 						</View>
@@ -460,32 +469,33 @@ export default function PublishSaleScreen() {
 							style={styles.textInput}
 							value={contactName}
 							onChangeText={setContactName}
-							placeholder="Demo User"
+							placeholder="Your name"
 							placeholderTextColor="#999"
 						/>
 					</View>
 
-					<Text style={styles.label}>Phone Number *</Text>
+					<Text style={styles.label}>Phone Number</Text>
 					<View style={styles.inputWithIcon}>
 						<IconSymbol size={16} name="phone.fill" color="#6F6A64" />
 						<TextInput
 							style={styles.textInput}
-							value={phone}
-							onChangeText={setPhone}
+							value={formatPhone(phone)}
+							onChangeText={(text) => setPhone(text.replace(/\D/g, ""))}
 							placeholder="(555) 123-4567"
 							placeholderTextColor="#999"
 							keyboardType="phone-pad"
+							maxLength={14}
 						/>
 					</View>
 
-					<Text style={styles.label}>Email *</Text>
+					<Text style={styles.label}>Email</Text>
 					<View style={styles.inputWithIcon}>
 						<IconSymbol size={16} name="envelope.fill" color="#6F6A64" />
 						<TextInput
 							style={styles.textInput}
 							value={email}
 							onChangeText={setEmail}
-							placeholder="mail.example@gmail.com"
+							placeholder="your@email.com"
 							placeholderTextColor="#999"
 							keyboardType="email-address"
 							autoCapitalize="none"
@@ -501,11 +511,10 @@ export default function PublishSaleScreen() {
 				<TouchableOpacity
 					style={[
 						styles.publishBtn,
-						(!canPublish || publishing) && { opacity: 0.5 },
+						(!canPublish || publishing) && styles.publishBtnDisabled,
 					]}
 					onPress={handlePublish}
 					disabled={!canPublish || publishing}
-					activeOpacity={0.92}
 				>
 					<IconSymbol size={20} name="checkmark.circle.fill" color="#fff" />
 					<Text style={styles.publishText}>
@@ -761,6 +770,9 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		justifyContent: "center",
 		gap: 10,
+	},
+	publishBtnDisabled: {
+		opacity: 0.5,
 	},
 	publishText: { color: "#fff", fontWeight: "900", fontSize: 18 },
 });

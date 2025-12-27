@@ -1,3 +1,5 @@
+// app/tabs/profile.tsx
+
 import ProfileAuthSheet from "@/components/profile/ProfileAuthSheet";
 import ProfileMenuSheet from "@/components/profile/ProfileMenuSheet";
 import ProfileSignupSheet from "@/components/profile/ProfileSignupSheet";

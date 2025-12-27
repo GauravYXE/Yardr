@@ -229,7 +229,7 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 			{/* Floating Action Button */}
 			<TouchableOpacity
 				style={styles.fab}
-				onPress={() => router.push("/sell/video")}
+				onPress={() => router.push("/sell")}
 				activeOpacity={0.9}
 			>
 				<Text style={styles.fabIcon}>+</Text>
