@@ -17,7 +17,7 @@ interface AuthContextType {
 		email: string,
 		password: string,
 		displayName?: string
-	) => Promise<void>;
+	) => Promise<{ user: User | null; session: Session | null }>;
 	signOut: () => Promise<void>;
 	refreshProfile: () => Promise<void>;
 }
@@ -77,6 +77,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 		}
 	};
 
+	const claimDeviceSalesIfAny = async () => {
+		try {
+			const deviceId = await rateLimitService.getDeviceId();
+			const claimedCount = await garageSaleService.claimDeviceSales(deviceId);
+			if (claimedCount > 0) {
+				console.log(`Claimed ${claimedCount} device sales`);
+			}
+		} catch (claimError) {
+			console.error("Error claiming device sales:", claimError);
+			// Don't block auth
+		}
+	};
+
 	const signIn = async (email: string, password: string) => {
 		try {
 			const { session } = await authService.signIn(email, password);
@@ -87,18 +100,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 				await loadUserProfile(session.user.id);
 
 				// Claim any anonymous sales from this device
-				try {
-					const deviceId = await rateLimitService.getDeviceId();
-					const claimedCount = await garageSaleService.claimDeviceSales(
-						deviceId
-					);
-					if (claimedCount > 0) {
-						console.log(`Claimed ${claimedCount} device sales`);
-					}
-				} catch (claimError) {
-					console.error("Error claiming device sales:", claimError);
-					// Don't block login
-				}
+				await claimDeviceSalesIfAny();
 			}
 		} catch (error) {
 			console.error("Error signing in:", error);
@@ -112,8 +114,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 		displayName?: string
 	) => {
 		try {
-			await authService.signUp(email, password, displayName);
-			// Note: We don't auto-login after signup (email verification may be required)
+			const { user, session } = await authService.signUp(
+				email,
+				password,
+				displayName
+			);
+
+			// If email confirmation is disabled, Supabase may return a session immediately.
+			// In that case, treat this as a logged-in user.
+			if (session?.user) {
+				setSession(session);
+				setUser(session.user);
+				await loadUserProfile(session.user.id);
+				await claimDeviceSalesIfAny();
+			}
+
+			return { user: user ?? null, session: session ?? null };
 		} catch (error) {
 			console.error("Error signing up:", error);
 			throw error;

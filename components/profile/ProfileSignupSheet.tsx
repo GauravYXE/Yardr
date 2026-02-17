@@ -32,8 +32,16 @@ export default function ProfileSignupSheet({
 
 		try {
 			setLoading(true);
-			await signUp(email, password, displayName);
-			onClose();
+			const { session } = await signUp(email, password, displayName);
+			if (session) {
+				onClose();
+				return;
+			}
+
+			alert(
+				"We sent you a confirmation email. Please confirm your email, then sign in to continue.",
+			);
+			onSwitchToLogin();
 		} catch (e: any) {
 			alert(e.message || "Signup failed");
 		} finally {

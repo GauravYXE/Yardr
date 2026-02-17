@@ -44,18 +44,16 @@ function formatAddress(p: Location.LocationGeocodedAddress | undefined) {
 
 function haversineKm(
 	a: { latitude: number; longitude: number },
-	b: { latitude: number; longitude: number }
+	b: { latitude: number; longitude: number },
 ) {
 	const R = 6371;
 	const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
 	const dLon = ((b.longitude - a.longitude) * Math.PI) / 180;
 	const lat1 = (a.latitude * Math.PI) / 180;
 	const lat2 = (b.latitude * Math.PI) / 180;
-
 	const x =
 		Math.sin(dLat / 2) * Math.sin(dLat / 2) +
 		Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
-
 	return R * (2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)));
 }
 
@@ -98,7 +96,7 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 
 			const list = await garageSaleService.getGarageSalesNearby(
 				loc.latitude,
-				loc.longitude
+				loc.longitude,
 			);
 			setSales(list);
 		} catch (e) {
@@ -115,11 +113,10 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 		}
 	}, []);
 
-	// Key fix: refresh whenever user comes back to this screen
 	useFocusEffect(
 		useCallback(() => {
 			loadSales();
-		}, [loadSales])
+		}, [loadSales]),
 	);
 
 	const onRefresh = useCallback(async () => {
@@ -133,7 +130,6 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 
 	const salesWithDistance: SaleWithDistance[] = useMemo(() => {
 		if (!userLoc) return sales.map((s) => ({ ...s, _distanceText: "" }));
-
 		return sales.map((s) => {
 			const km = haversineKm(userLoc, s.location);
 			const feet = km * 3280.84;
@@ -152,8 +148,15 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 			latitudeDelta: 0.06,
 			longitudeDelta: 0.06,
 		}),
-		[userLoc]
+		[userLoc],
 	);
+
+	// FIX: FAB pushes /sell which now has an auth guard in sell/_layout.tsx.
+	// If not logged in, sell/_layout redirects to sign-in with redirectTo=/sell.
+	// After login/signup, the user lands back at /sell/index.
+	const handleAddSale = () => {
+		router.push("/sell");
+	};
 
 	return (
 		<SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
@@ -168,7 +171,7 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 						numberOfLines={1}
 						style={[styles.addressText, { color: theme.secondaryText }]}
 					>
-						{addressLine || "Fetching your location..."}
+						{addressLine || "Fetching your location…"}
 					</Text>
 				</View>
 
@@ -231,10 +234,10 @@ export default function DiscoverScreen({ initialMode }: { initialMode: Mode }) {
 				)}
 			</View>
 
-			{/* Floating Action Button */}
+			{/* Floating Action Button — auth guard lives in sell/_layout.tsx */}
 			<TouchableOpacity
 				style={styles.fab}
-				onPress={() => router.push("/sell")}
+				onPress={handleAddSale}
 				activeOpacity={0.9}
 			>
 				<Text style={styles.fabIcon}>+</Text>

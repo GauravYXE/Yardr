@@ -19,14 +19,20 @@ export const authService = {
 
     if (error) throw error;
 
-    // Create user profile
-    if (data.user) {
-      const { error: profileError } = await supabase.from('user_profiles').insert([
-        {
-          id: data.user.id,
-          display_name: displayName || null,
-        },
-      ]);
+    // Create user profile only when a full session exists.
+    // When email confirmation is required, Supabase does not create a session yet,
+    // and the auth user row may not be available to satisfy the foreign key,
+    // which would cause a FK violation. We defer profile creation until after login.
+    if (data.session?.user) {
+      const user = data.session.user;
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .insert([
+          {
+            id: user.id,
+            display_name: displayName || null,
+          },
+        ]);
 
       if (profileError) {
         console.error('Error creating user profile:', profileError);

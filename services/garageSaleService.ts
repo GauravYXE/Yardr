@@ -1,21 +1,17 @@
+// services/garageSaleService.ts
 import { supabase } from "@/lib/supabase";
 import { GarageSale } from "@/types/garageSale";
 
-/* -----------------------------
-   Centralized Error Logger
------------------------------- */
+/* ─── Logging helper ─────────────────────────────────────────────────────── */
 const logSupabaseError = (context: string, error: any) => {
 	console.error(`🔴 Supabase Error in ${context}`);
 	console.error("Message:", error?.message);
 	console.error("Code:", error?.code);
 	console.error("Details:", error?.details);
 	console.error("Hint:", error?.hint);
-	console.error("Full object:", JSON.stringify(error, null, 2));
 };
 
-/* -----------------------------
-   Database Row Type
------------------------------- */
+/* ─── DB row type ────────────────────────────────────────────────────────── */
 interface GarageSaleRow {
 	id: string;
 	title: string;
@@ -40,9 +36,7 @@ interface GarageSaleRow {
 	device_id?: string | null;
 }
 
-/* -----------------------------
-   Mapper
------------------------------- */
+/* ─── Mapper ─────────────────────────────────────────────────────────────── */
 const mapRowToGarageSale = (row: GarageSaleRow): GarageSale => ({
 	id: row.id,
 	title: row.title,
@@ -68,10 +62,9 @@ const mapRowToGarageSale = (row: GarageSaleRow): GarageSale => ({
 	userId: row.user_id || undefined,
 });
 
-/* -----------------------------
-   Service
------------------------------- */
+/* ─── Service ────────────────────────────────────────────────────────────── */
 export const garageSaleService = {
+	/* ── Read all ── */
 	getAllGarageSales: async (): Promise<GarageSale[]> => {
 		try {
 			const { data, error } = await supabase
@@ -92,6 +85,7 @@ export const garageSaleService = {
 		}
 	},
 
+	/* ── Read nearby ── */
 	getGarageSalesNearby: async (
 		latitude: number,
 		longitude: number,
@@ -108,18 +102,16 @@ export const garageSaleService = {
 				throw new Error(error.message);
 			}
 
-			const nearby = (data || []).map(mapRowToGarageSale).filter((sale) => {
-				const distance = calculateDistance(
+			return (data || []).map(mapRowToGarageSale).filter((sale) => {
+				const dist = calculateDistance(
 					{ latitude, longitude },
 					{
 						latitude: sale.location.latitude,
 						longitude: sale.location.longitude,
 					},
 				);
-				return distance <= radiusKm;
+				return dist <= radiusKm;
 			});
-
-			return nearby;
 		} catch (error: any) {
 			console.error(
 				"🔴 Runtime Error in getGarageSalesNearby:",
@@ -129,6 +121,7 @@ export const garageSaleService = {
 		}
 	},
 
+	/* ── Read by ID ── */
 	getGarageSaleById: async (id: string): Promise<GarageSale | null> => {
 		try {
 			const { data, error } = await supabase
@@ -149,6 +142,29 @@ export const garageSaleService = {
 		}
 	},
 
+	/* ── Get sales for a specific user (My Sales screen) ── */
+	getMySales: async (userId: string): Promise<GarageSale[]> => {
+		try {
+			const { data, error } = await supabase
+				.from("garage_sales")
+				.select("*")
+				.eq("user_id", userId)
+				.eq("is_active", true)
+				.order("created_at", { ascending: false });
+
+			if (error) {
+				logSupabaseError("getMySales", error);
+				throw new Error(error.message);
+			}
+
+			return (data || []).map(mapRowToGarageSale);
+		} catch (error: any) {
+			console.error("🔴 Runtime Error in getMySales:", error?.message);
+			throw error;
+		}
+	},
+
+	/* ── Create ── */
 	addGarageSale: async (
 		sale: Omit<GarageSale, "id" | "createdAt">,
 		deviceId?: string,
@@ -195,6 +211,52 @@ export const garageSaleService = {
 		}
 	},
 
+	/* ── Update ── */
+	updateGarageSale: async (
+		id: string,
+		updates: Partial<{
+			title: string;
+			description: string;
+			contactName: string;
+			contactPhone: string;
+			contactEmail: string;
+			videoUrl: string;
+			isActive: boolean;
+		}>,
+	): Promise<void> => {
+		try {
+			// Map GarageSale field names → DB column names
+			const dbUpdates: Record<string, any> = {};
+			if (updates.title !== undefined) dbUpdates.title = updates.title;
+			if (updates.description !== undefined)
+				dbUpdates.description = updates.description;
+			if (updates.contactName !== undefined)
+				dbUpdates.contact_name = updates.contactName;
+			if (updates.contactPhone !== undefined)
+				dbUpdates.contact_phone = updates.contactPhone;
+			if (updates.contactEmail !== undefined)
+				dbUpdates.contact_email = updates.contactEmail;
+			if (updates.videoUrl !== undefined)
+				dbUpdates.video_url = updates.videoUrl;
+			if (updates.isActive !== undefined)
+				dbUpdates.is_active = updates.isActive;
+
+			const { error } = await supabase
+				.from("garage_sales")
+				.update(dbUpdates)
+				.eq("id", id);
+
+			if (error) {
+				logSupabaseError("updateGarageSale", error);
+				throw new Error(error.message);
+			}
+		} catch (error: any) {
+			console.error("🔴 Runtime Error in updateGarageSale:", error?.message);
+			throw error;
+		}
+	},
+
+	/* ── Soft-delete (deactivate) ── */
 	deleteGarageSale: async (id: string): Promise<void> => {
 		try {
 			const { error } = await supabase
@@ -211,11 +273,35 @@ export const garageSaleService = {
 			throw error;
 		}
 	},
+
+	/* ── Claim device sales after login ── */
+	// Calls the Postgres function defined in your SQL migration.
+	// Associates all anonymous device sales with the now-authenticated user.
+	claimDeviceSales: async (deviceId: string): Promise<number> => {
+		try {
+			const { data, error } = await supabase.rpc("claim_device_sales", {
+				p_device_id: deviceId,
+			});
+
+			if (error) {
+				logSupabaseError("claimDeviceSales", error);
+				// Don't throw — this is non-critical; the user is still logged in.
+				return 0;
+			}
+
+			return (data as number) || 0;
+		} catch (error: any) {
+			console.error("🔴 Runtime Error in claimDeviceSales:", error?.message);
+			return 0;
+		}
+	},
 };
 
-/* -----------------------------
-   Distance Helper
------------------------------- */
+/* ─── Standalone exports used by my-sales.tsx ────────────────────────────── */
+export const getMySales = garageSaleService.getMySales;
+export const deleteSale = garageSaleService.deleteGarageSale;
+
+/* ─── Distance helper ────────────────────────────────────────────────────── */
 const calculateDistance = (
 	point1: { latitude: number; longitude: number },
 	point2: { latitude: number; longitude: number },
@@ -225,7 +311,6 @@ const calculateDistance = (
 	const dLon = toRad(point2.longitude - point1.longitude);
 	const lat1 = toRad(point1.latitude);
 	const lat2 = toRad(point2.latitude);
-
 	const a =
 		Math.sin(dLat / 2) ** 2 +
 		Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);

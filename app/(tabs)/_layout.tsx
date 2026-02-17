@@ -1,5 +1,5 @@
 // app/(tabs)/_layout.tsx
-import * as Haptics from "expo-haptics"; // Optional: for nice tactile feedback
+import * as Haptics from "expo-haptics";
 import { Tabs, router } from "expo-router";
 import React from "react";
 
@@ -51,11 +51,11 @@ export default function TabLayout() {
 				}}
 			/>
 
-			{/* Invisible "Sell" tab — acts as the + FAB */}
+			{/* "Sell" FAB button — hidden from tab bar, intercepts tap */}
 			<Tabs.Screen
 				name="sell"
 				options={{
-					href: null, // Hides this tab from the tab bar completely
+					href: null, // Hides from tab bar UI
 					title: "Sell",
 					tabBarIcon: ({ color }) => (
 						<IconSymbol size={36} name="plus.circle.fill" color={color} />
@@ -63,19 +63,12 @@ export default function TabLayout() {
 				}}
 				listeners={{
 					tabPress: (e) => {
-						// Prevent default tab navigation
 						e.preventDefault();
-
-						// Optional: Give user haptic feedback when tapping +
 						Haptics.selectionAsync();
-
-						// Navigate to the protected add-sale flow
-						// This will be intercepted by add-sale/_layout.tsx if not logged in
-						router.push({
-							pathname: "/add-sale",
-							// Ensures instant visual transition
-							params: { unstable_flushSync: true },
-						});
+						// Push /sell — the sell/_layout.tsx auth guard will
+						// redirect to sign-in if the user is not logged in,
+						// then bounce back here after a successful login/signup.
+						router.push("/sell");
 					},
 				}}
 			/>
