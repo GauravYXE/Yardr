@@ -2,7 +2,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { deleteSale, getMySales } from "@/services/garageSaleService";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
 	Alert,
 	Image,
@@ -19,13 +19,22 @@ export default function MySalesScreen() {
 	const [sales, setSales] = useState<any[]>([]);
 	const [loading, setLoading] = useState(true);
 
-	// Redirect if not logged in
-	if (!user) {
-		router.replace("/profile");
-		return null;
-	}
+	// Redirect if not logged in, using an effect to avoid navigation during render
+	useEffect(() => {
+		if (!user) {
+			router.replace("/profile");
+		}
+	}, [user]);
 
 	const load = async () => {
+		// If the user is not logged in, the redirect effect will run.
+		// Avoid calling Supabase with an undefined user ID.
+		if (!user) {
+			setSales([]);
+			setLoading(false);
+			return;
+		}
+
 		setLoading(true);
 		const data = await getMySales(user.id);
 		setSales(data || []);
@@ -36,7 +45,7 @@ export default function MySalesScreen() {
 	useFocusEffect(
 		useCallback(() => {
 			load();
-		}, [])
+		}, []),
 	);
 
 	const confirmDelete = (id: string) => {

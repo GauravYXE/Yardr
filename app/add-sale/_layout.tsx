@@ -1,14 +1,26 @@
 // app/add-sale/_layout.tsx
 import { useAuth } from "@/contexts/AuthContext";
-import { Redirect, Stack } from "expo-router";
-import React from "react";
+import { Stack, useRouter } from "expo-router";
+import React, { useEffect } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 
 export default function AddSaleLayout() {
 	const { user, loading } = useAuth();
+	const router = useRouter();
 
-	// Show loading spinner while checking auth
-	if (loading) {
+	// Auth guard for the whole /add-sale group.
+	// Use an effect for navigation to avoid redirecting during render.
+	useEffect(() => {
+		if (!loading && !user) {
+			router.replace({
+				pathname: "/auth/sign-in",
+				params: { redirectTo: "/add-sale" },
+			});
+		}
+	}, [loading, user, router]);
+
+	// While we're checking auth or redirecting, show a simple loading state.
+	if (loading || !user) {
 		return (
 			<View
 				style={{
@@ -26,12 +38,6 @@ export default function AddSaleLayout() {
 		);
 	}
 
-	// Not logged in → send to Profile tab
-	if (!user) {
-		return <Redirect href="/(tabs)/profile" />;
-	}
-
-	// Logged in → let Expo Router auto-load app/add-sale/add-sale.tsx
+	// Logged in → let Expo Router auto-load app/add-sale/index.tsx
 	return <Stack screenOptions={{ headerShown: false }} />;
-	// ← Empty Stack is perfect here — no manual screens needed!
 }

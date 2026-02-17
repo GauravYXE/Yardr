@@ -1,5 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
 	Alert,
@@ -21,7 +21,10 @@ export default function SignUpScreen() {
 	const [loading, setLoading] = useState(false);
 	const [showPassword, setShowPassword] = useState(false);
 	const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-	const { signUp } = useAuth();
+	const { signUp, signIn } = useAuth();
+	const params = useLocalSearchParams<{ redirectTo?: string }>();
+	const redirectTo =
+		typeof params.redirectTo === "string" ? params.redirectTo : undefined;
 
 	const handleSignUp = async () => {
 		// Validation
@@ -42,22 +45,32 @@ export default function SignUpScreen() {
 
 		setLoading(true);
 		try {
-			await signUp(email.trim(), password, displayName.trim() || undefined);
-			Alert.alert(
-				"Success",
-				"Account created! Please check your email to verify your account.",
-				[
-					{
-						text: "OK",
-						onPress: () => router.push("/auth/sign-in"),
+			const trimmedEmail = email.trim();
+			const trimmedDisplayName = displayName.trim() || undefined;
+
+			// Create the account
+			await signUp(trimmedEmail, password, trimmedDisplayName);
+
+			// Immediately sign the user in after successful signup
+			await signIn(trimmedEmail, password);
+
+			Alert.alert("Success", "Account created and you are now signed in.", [
+				{
+					text: "Continue",
+					onPress: () => {
+						if (redirectTo) {
+							router.replace(redirectTo as any);
+						} else {
+							router.replace("/(tabs)");
+						}
 					},
-				]
-			);
+				},
+			]);
 		} catch (error: any) {
 			console.error("Sign up error:", error);
 			Alert.alert(
 				"Sign Up Failed",
-				error.message || "Could not create account"
+				error.message || "Could not create account",
 			);
 		} finally {
 			setLoading(false);

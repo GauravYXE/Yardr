@@ -1,5 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
 	Alert,
@@ -19,6 +19,9 @@ export default function SignInScreen() {
 	const [loading, setLoading] = useState(false);
 	const [showPassword, setShowPassword] = useState(false);
 	const { signIn } = useAuth();
+	const params = useLocalSearchParams<{ redirectTo?: string }>();
+	const redirectTo =
+		typeof params.redirectTo === "string" ? params.redirectTo : undefined;
 
 	const handleSignIn = async () => {
 		if (!email || !password) {
@@ -30,12 +33,19 @@ export default function SignInScreen() {
 		try {
 			await signIn(email.trim(), password);
 			Alert.alert("Success", "Signed in successfully!");
-			router.back();
+
+			if (redirectTo) {
+				router.replace(redirectTo as any);
+			} else if (router.canGoBack()) {
+				router.back();
+			} else {
+				router.replace("/(tabs)");
+			}
 		} catch (error: any) {
 			console.error("Sign in error:", error);
 			Alert.alert(
 				"Sign In Failed",
-				error.message || "Invalid email or password"
+				error.message || "Invalid email or password",
 			);
 		} finally {
 			setLoading(false);
@@ -104,7 +114,12 @@ export default function SignInScreen() {
 						<View style={styles.divider} />
 
 						<TouchableOpacity
-							onPress={() => router.push("/auth/sign-up")}
+							onPress={() =>
+								router.push({
+									pathname: "/auth/sign-up",
+									params: redirectTo ? { redirectTo } : undefined,
+								})
+							}
 							disabled={loading}
 							style={styles.linkButton}
 						>

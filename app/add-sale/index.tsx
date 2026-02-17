@@ -75,7 +75,7 @@ export default function AddSaleScreen() {
 
 	const handleVideoRecorded = async (
 		recordedVideoUri: string,
-		frames: string[]
+		frames: string[],
 	) => {
 		setAnalyzing(true);
 		setLocalVideoUri(recordedVideoUri);
@@ -121,7 +121,7 @@ export default function AddSaleScreen() {
 			}
 
 			const thumbnailPromises = [0, 2500, 4500].map((time) =>
-				VideoThumbnails.getThumbnailAsync(recordedVideoUri, { time })
+				VideoThumbnails.getThumbnailAsync(recordedVideoUri, { time }),
 			);
 			const thumbnails = await Promise.all(thumbnailPromises);
 
@@ -131,7 +131,7 @@ export default function AddSaleScreen() {
 						encoding: EncodingType.Base64,
 					});
 					return base64;
-				})
+				}),
 			);
 
 			let analysis;
@@ -212,7 +212,7 @@ export default function AddSaleScreen() {
 				setLoading(false);
 				Alert.alert(
 					"Posting Limit Reached",
-					rateCheck.message || "You have reached the posting limit."
+					rateCheck.message || "You have reached the posting limit.",
 				);
 				return;
 			}
@@ -271,12 +271,12 @@ export default function AddSaleScreen() {
 					isActive: true,
 				},
 				deviceId,
-				user?.id
+				user?.id,
 			);
 
-			Alert.alert("Success", "Your garage sale has been posted!", [
-				{ text: "OK", onPress: () => router.back() },
-			]);
+			// Navigate to a dedicated success screen that offers
+			// "View My Sales" and "Go Home" actions.
+			router.replace("/sell/success");
 		} catch (error: any) {
 			console.error("Error creating garage sale:", error);
 			Alert.alert("Error", "Failed to post garage sale. Please try again.");
