@@ -1,0 +1,113 @@
+import { useState, useEffect } from 'react';
+import { TouchableOpacity, Alert, Animated } from 'react-native';
+import { router } from 'expo-router';
+import { ThemedText } from '@/components/themed-text';
+import { useAuth } from '@/contexts/AuthContext';
+import { favoritesService } from '@/services/favoritesService';
+
+import styles from './styles';
+
+interface FavoriteButtonProps {
+  garageSaleId: string;
+  size?: number;
+  showLabel?: boolean;
+}
+
+export default function FavoriteButton({
+  garageSaleId,
+  size = 24,
+  showLabel = false,
+}: FavoriteButtonProps) {
+  const { isAuthenticated, user } = useAuth();
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [scaleAnim] = useState(new Animated.Value(1));
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      checkFavoriteStatus();
+    }
+  }, [isAuthenticated, user, garageSaleId]);
+
+  const checkFavoriteStatus = async () => {
+    if (!user) return;
+
+    try {
+      const favorited = await favoritesService.isFavorited(user.id, garageSaleId);
+      setIsFavorited(favorited);
+    } catch (error) {
+      console.error('Error checking favorite status:', error);
+    }
+  };
+
+  const animateHeart = () => {
+    Animated.sequence([
+      Animated.spring(scaleAnim, {
+        toValue: 1.3,
+        friction: 3,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 3,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const handlePress = async () => {
+    if (!isAuthenticated) {
+      Alert.alert(
+        'Sign In Required',
+        'Please sign in to save your favorite garage sales',
+        [
+          { text: 'Maybe Later', style: 'cancel' },
+          {
+            text: 'Sign In',
+            onPress: () => router.push('/auth/sign-in'),
+          },
+        ]
+      );
+      return;
+    }
+
+    if (!user || loading) return;
+
+    setLoading(true);
+    try {
+      if (isFavorited) {
+        await favoritesService.removeFavorite(user.id, garageSaleId);
+        setIsFavorited(false);
+      } else {
+        await favoritesService.addFavorite(user.id, garageSaleId);
+        setIsFavorited(true);
+        animateHeart();
+      }
+    } catch (error: any) {
+      console.error('Error toggling favorite:', error);
+      Alert.alert('Error', error.message || 'Failed to update favorite');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <TouchableOpacity
+      style={[styles.button, showLabel && styles.buttonWithLabel]}
+      onPress={handlePress}
+      disabled={loading}
+    >
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        <ThemedText style={[styles.icon, { fontSize: size }]}>
+          {isFavorited ? '❤️' : '🤍'}
+        </ThemedText>
+      </Animated.View>
+      {showLabel && (
+        <ThemedText style={styles.label}>
+          {isFavorited ? 'Favorited' : 'Favorite'}
+        </ThemedText>
+      )}
+    </TouchableOpacity>
+  );
+}
+

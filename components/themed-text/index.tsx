@@ -1,5 +1,8 @@
-export { ThemedText } from "./themed-text/index";
-export type { ThemedTextProps } from "./themed-text/index";
+import { Text, type TextProps } from 'react-native';
+
+import { useThemeColor } from '@/hooks/use-theme-color';
+
+import styles from './styles';
 
 export type ThemedTextProps = TextProps & {
   lightColor?: string;
@@ -31,3 +34,4 @@ export function ThemedText({
     />
   );
 }
+
